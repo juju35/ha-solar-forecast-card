@@ -1,7 +1,8 @@
 // Shared by the screenshot scripts: theme variables, <ha-card> / <ha-icon> stand-ins, and the render loop.
 import { chromium } from "playwright";
 import * as mdi from "@mdi/js";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const root = fileURLToPath(new URL("../..", import.meta.url));
@@ -155,6 +156,8 @@ export const writeIfChanged = async (page, path, png) => {
     );
     if (same) return false;
   }
+  // The first run of a new repository: no screenshots/ folder yet.
+  mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, png);
   return true;
 };
