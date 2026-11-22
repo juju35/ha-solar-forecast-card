@@ -614,7 +614,10 @@ class SolarForecastMiniCard extends rcMini(
 
   _drawMini(m) {
     const night = this._night();
-    if (!this._changed(["mini", m.state, m.total, m.remaining, m.produced, m.soFar, m.tomorrow, night, m.p > 0.5])) return;
+    // Rebuilt only when what it shows changes: the energies as written, the ring by steps of 2.5 %.
+    const done = m.produced ?? m.soFar;
+    const pct = m.total ? Math.min(100, ((done || 0) / m.total) * 100) : 0;
+    if (!this._changed(["mini", m.state, this._kwh(m.remaining), this._kwh(m.tomorrow), Math.round(pct / 2.5), night, m.p > 0.5, Math.round(m.p * 20)])) return;
     const status = this._t(`st_${m.state === "none" ? "offline" : m.state}`);
     // A chip opens its sensor's more-info; one with nothing to open is plain text.
     const chip = (text, id) =>
@@ -628,8 +631,6 @@ class SolarForecastMiniCard extends rcMini(
           .filter(Boolean)
           .join("");
     // The ring around the badge: the share of today's forecast already produced.
-    const done = m.produced ?? m.soFar;
-    const pct = m.total ? Math.min(100, ((done || 0) / m.total) * 100) : 0;
     const L = 2 * Math.PI * 17;
     const ring = `<svg class="ringb" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="17" fill="none" stroke="color-mix(in srgb, var(--c) 18%, transparent)" stroke-width="4"/><circle cx="20" cy="20" r="17" fill="none" stroke="var(--c)" stroke-width="4" stroke-linecap="round" stroke-dasharray="${((L * pct) / 100).toFixed(1)} 999" transform="rotate(-90 20 20)"/></svg>`;
     const c = this._config;
