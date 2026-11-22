@@ -24,7 +24,7 @@ If applicable, add screenshots to help explain your problem.
 **Environment:**
 - Home Assistant version:
 - Browser:
-- HACS version:
+- Marketplace version:
 - Card version:
 - Card (solar-forecast-card or solar-forecast-mini-card):
 - Forecast integration (Forecast.Solar, Solcast, Open-Meteo…):
