@@ -11,9 +11,9 @@
 <p align="center"><img src="https://raw.githubusercontent.com/juju35/ha-solar-forecast-card/main/images/icon.svg" alt="Solar Forecast Card" width="120"></p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/juju35/ha-solar-forecast-card/main/images/forecast-solar.png" alt="Forecast.Solar" height="36">&nbsp;&nbsp;
-  <img src="https://raw.githubusercontent.com/juju35/ha-solar-forecast-card/main/images/solcast.png" alt="Solcast PV Forecast" height="36">&nbsp;&nbsp;
-  <img src="https://raw.githubusercontent.com/juju35/ha-solar-forecast-card/main/images/open-meteo-solar-forecast.png" alt="Open-Meteo Solar Forecast" height="36">
+  <img src="https://raw.githubusercontent.com/juju35/ha-solar-forecast-card/main/images/forecast-solar.png" alt="Forecast.Solar" height="24">&nbsp;&nbsp;
+  <img src="https://raw.githubusercontent.com/juju35/ha-solar-forecast-card/main/images/solcast.png" alt="Solcast PV Forecast" height="24">&nbsp;&nbsp;
+  <img src="https://raw.githubusercontent.com/juju35/ha-solar-forecast-card/main/images/open-meteo-solar-forecast.png" alt="Open-Meteo Solar Forecast" height="24">
 </p>
 
 A Lovelace card for **solar production forecasts**: today's forecast curve against the actual production, the energy still to come, tomorrow's total and the best time to run the dishwasher or charge the car.
@@ -47,9 +47,9 @@ The card reads the forecast sensors of these integrations. Their hour by hour fo
 
 | | Integration | What the cards show |
 |:---:|---|---|
-| <img src="https://raw.githubusercontent.com/juju35/ha-solar-forecast-card/main/images/forecast-solar.png" alt="Forecast.Solar" height="24"> | [Forecast.Solar](https://www.home-assistant.io/integrations/forecast_solar/) (built in) | Forecast for today and tomorrow, power now and next hour, peak time |
-| <img src="https://raw.githubusercontent.com/juju35/ha-solar-forecast-card/main/images/solcast.png" alt="Solcast PV Forecast" height="24"> | [Solcast PV Forecast](https://github.com/BJReplay/ha-solcast-solar) (Marketplace) | Detailed forecast with P10 / P90 estimates, today, tomorrow and the next days |
-| <img src="https://raw.githubusercontent.com/juju35/ha-solar-forecast-card/main/images/open-meteo-solar-forecast.png" alt="Open-Meteo Solar Forecast" height="24"> | [Open-Meteo Solar Forecast](https://github.com/rany2/ha-open-meteo-solar-forecast) (Marketplace) | Free forecast with no account, today and the next days |
+| <img src="https://raw.githubusercontent.com/juju35/ha-solar-forecast-card/main/images/forecast-solar.png" alt="Forecast.Solar" height="16"> | [Forecast.Solar](https://www.home-assistant.io/integrations/forecast_solar/) (built in) | Forecast for today and tomorrow, power now and next hour, peak time |
+| <img src="https://raw.githubusercontent.com/juju35/ha-solar-forecast-card/main/images/solcast.png" alt="Solcast PV Forecast" height="16"> | [Solcast PV Forecast](https://github.com/BJReplay/ha-solcast-solar) (Marketplace) | Detailed forecast with P10 / P90 estimates, today, tomorrow and the next days |
+| <img src="https://raw.githubusercontent.com/juju35/ha-solar-forecast-card/main/images/open-meteo-solar-forecast.png" alt="Open-Meteo Solar Forecast" height="16"> | [Open-Meteo Solar Forecast](https://github.com/rany2/ha-open-meteo-solar-forecast) (Marketplace) | Free forecast with no account, today and the next days |
 
 ## Installation
 
@@ -154,7 +154,9 @@ entities:
 
 - **Forecast**: `entity`, else the first *energy production today* sensor of Forecast.Solar, Solcast or Open-Meteo Solar Forecast; the other roles on its device by their translation key or entity id: `today`, `remaining`, `tomorrow`, `day3` (Solcast), `now` (the power now), `peak` (the peak time); `entities` sets any of them
 - **Hour by hour**: Solcast's `detailedHourly` / `detailedForecast` and Open-Meteo's `wh_period` attributes, else the Energy dashboard's forecast (`energy/solar_forecast`): the entries of the chosen sensor's device when `entity` is set, else those of its integration, so two integrations forecasting the same roof are not added up (the planes of one integration are); without either, the card shows the numbers and a hint
-- **Production**: the hourly `change` of the production sensor's statistics since midnight (`recorder/statistics_during_period`), fetched at first, every 10 minutes and at each new hour; the sensor is `production`, else the Energy dashboard's solar source
+- **Production**: the hourly `change` of the production sensor's statistics since midnight (`recorder/statistics_during_period`); the sensor is `production`, else the Energy dashboard's solar source
+- **Days and hours**: counted in Home Assistant's time zone, like its own dashboards (the browser's when the user's profile asks for it)
+- **Refresh**: the forecast sensors' states and attributes live; the Energy dashboard's forecast and the production statistics fetched at first, every 10 minutes and at each new hour
 - **Status**: produced against the forecast so far (today's forecast minus what is still to come) once 0.2 kWh were expected: above 110 %, on track from 85 %, below under that; *Night* while `sun.sun` is below the horizon; *Forecast* without a production
 - **Best time**: the `window_hours` hours in a row with the most forecast energy, from the next hour once a quarter of this one has gone; when none is left today, tomorrow's
 - **Read only**: the card calls no action
