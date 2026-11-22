@@ -135,6 +135,7 @@ class SolarForecastCard extends RcCard {
     if (!h?.callWS || this._busy) return;
     this._busy = true;
     const now = Date.now();
+    const tz = sfTz(h);
     try {
       let prod = this._config.production;
       if (!prod) {
@@ -147,17 +148,17 @@ class SolarForecastCard extends RcCard {
         const r = await h
           .callWS({
             type: "recorder/statistics_during_period",
-            start_time: new Date(sfDay(now)).toISOString(),
-            end_time: new Date(sfHour(now) + 3.6e6).toISOString(),
+            start_time: new Date(sfDay(now, 0, tz)).toISOString(),
+            end_time: new Date(sfHour(now, tz) + 3.6e6).toISOString(),
             statistic_ids: [prod],
             period: "hour",
             types: ["change"],
             units: { energy: "kWh" },
           })
           .catch(() => null);
-        if (r) act = new Map((r[prod] || []).map((x) => [sfHour(typeof x.start === "number" ? x.start : new Date(x.start).getTime()), Number(x.change) || 0]));
+        if (r) act = new Map((r[prod] || []).map((x) => [sfHour(typeof x.start === "number" ? x.start : new Date(x.start).getTime(), tz), Number(x.change) || 0]));
       }
-      this._ws = { wh, act, prod, hour: sfHour(now), at: now };
+      this._ws = { wh, act, prod, hour: sfHour(now, tz), at: now };
     } finally {
       this._busy = false;
     }
@@ -182,9 +183,11 @@ class SolarForecastCard extends RcCard {
     return v >= 1000 ? `${this._fmt(v / 1000, 1)} kW` : `${this._fmt(v, 0)} W`;
   }
 
+  // Times are shown in the time zone the days are counted in.
   _time(t, opts) {
+    const tz = sfTz(this._hass);
     try {
-      return sfIntl(Intl.DateTimeFormat, this._lang(), opts).format(new Date(t));
+      return sfIntl(Intl.DateTimeFormat, this._lang(), tz ? { ...opts, timeZone: tz } : opts).format(new Date(t));
     } catch {
       return new Date(t).toTimeString().slice(0, 5);
     }
@@ -203,29 +206,32 @@ class SolarForecastCard extends RcCard {
     const h = this._hass;
     const c = this._config;
     const now = Date.now();
+    const tz = sfTz(h);
     const ws = this._ws;
     // Fetched at first, every SF_REFRESH, and at each new hour.
-    if (h.callWS && !this._busy && (!ws || ws.hour !== sfHour(now))) this._fetch();
+    if (h.callWS && !this._busy && (!ws || ws.hour !== sfHour(now, tz))) this._fetch();
     const e = rcMemo((this._memo ||= {}), "find", [c.entity, c.entities, h.entities], () => sfFind(h, c.entity, c.entities || {}));
     const st = (role) => (e[role] ? h.states[e[role]] : undefined);
     const todaySt = st("today");
     const hourly = new Map();
-    for (const r of ["today", "tomorrow", "day3"]) sfAttrHours(st(r), hourly);
-    if (!hourly.size) sfWsHours(ws?.wh, hourly);
+    for (const r of ["today", "tomorrow", "day3"]) sfAttrHours(st(r), hourly, tz);
+    if (!hourly.size) sfWsHours(ws?.wh, hourly, tz);
     const act = ws?.act || null;
+    // The 24 hour starts of today and the next two days, worked out once a day.
+    const starts = rcMemo(this._memo, "hours", [sfDay(now, 0, tz), tz], () =>
+      [0, 1, 2].map((offset) => {
+        const p = sfParts(sfDay(now, offset, tz), tz);
+        return Array.from({ length: 24 }, (_, i) => sfAt(p.y, p.m, p.d, i, tz));
+      }),
+    );
     const day = (offset) =>
-      Array.from({ length: 24 }, (_, i) => {
-        const d = new Date(sfDay(now, offset));
-        d.setHours(i);
-        const t = d.getTime();
-        return { t, f: hourly.has(t) ? hourly.get(t) : null, a: act?.has(t) ? act.get(t) : null };
-      });
+      starts[offset].map((t) => ({ t, f: hourly.has(t) ? hourly.get(t) : null, a: act?.has(t) ? act.get(t) : null }));
     const today = day(0);
     const tom = day(1);
     const aft = day(2);
     const sumF = (hours) => hours.reduce((s, x) => s + (x.f || 0), 0);
     const hasHourly = today.some((x) => x.f != null);
-    const cur = sfHour(now);
+    const cur = sfHour(now, tz);
     const frac = (now - cur) / 3.6e6;
     const total = sfKwh(todaySt) ?? (hasHourly ? sumF(today) : null);
     const future = today.reduce((s, x) => s + (x.t > cur ? x.f || 0 : x.t === cur ? (x.f || 0) * (1 - frac) : 0), 0);
@@ -257,7 +263,8 @@ class SolarForecastCard extends RcCard {
     const best = bestToday || sfBestWindow(tom, 0, w);
     // The sun's place on its arc: between the first and the last lit hour of today.
     const [r0, r1] = range || [6, 20];
-    const p = (new Date(now).getHours() + new Date(now).getMinutes() / 60 - r0) / (r1 + 1 - r0);
+    const wall = sfParts(now, tz);
+    const p = (wall.h + wall.min / 60 - r0) / (r1 + 1 - r0);
     const dev = e.today && h.devices?.[h.entities?.[e.today]?.device_id];
     return {
       none: state === "none",

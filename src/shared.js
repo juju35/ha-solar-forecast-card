@@ -492,27 +492,62 @@ const sfFind = (hass, entity, overrides = {}) => {
   return { ...out, ...Object.fromEntries(Object.entries(overrides).filter(([, v]) => v)) };
 };
 
-// The start of the hour holding `t` (ms), in the browser's time zone.
-const sfHour = (t) => {
-  const d = new Date(t);
-  d.setMinutes(0, 0, 0);
-  return d.getTime();
+// The time zone the days are counted in, the way Home Assistant's own dashboards count them: the server's
+// (hass.config.time_zone), unless the user's profile asks for the browser's. Undefined: the browser's.
+const sfTz = (hass) => (hass?.locale?.time_zone === "local" ? undefined : hass?.config?.time_zone) || undefined;
+
+// The offset (ms) of `tz` (else the browser's time zone) from UTC at `t`.
+const sfOffset = (t, tz) => {
+  if (!tz) return -new Date(t).getTimezoneOffset() * 6e4;
+  try {
+    const parts = sfIntl(Intl.DateTimeFormat, "en-US", {
+      timeZone: tz,
+      hourCycle: "h23",
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+      hour: "numeric",
+      minute: "numeric",
+      second: "numeric",
+    }).formatToParts(t);
+    const g = (k) => Number(parts.find((x) => x.type === k)?.value);
+    const s = Math.floor(t / 1000) * 1000;
+    return Date.UTC(g("year"), g("month") - 1, g("day"), g("hour") % 24, g("minute"), g("second")) - s;
+  } catch {
+    return -new Date(t).getTimezoneOffset() * 6e4;
+  }
+};
+// The wall clock of `t` in `tz`: year, month (0-11), day, hour, minute.
+const sfParts = (t, tz) => {
+  const d = new Date(t + sfOffset(t, tz));
+  return { y: d.getUTCFullYear(), m: d.getUTCMonth(), d: d.getUTCDate(), h: d.getUTCHours(), min: d.getUTCMinutes() };
+};
+// The instant of a wall clock time in `tz` (days and hours past their range roll over, like Date's setters).
+const sfAt = (y, m, d, h, tz) => {
+  const wall = Date.UTC(y, m, d, h);
+  const t = wall - sfOffset(wall, tz);
+  const off = sfOffset(t, tz);
+  return off === sfOffset(wall, tz) ? t : wall - off;
+};
+// The start of the hour holding `t` (ms), at `t`'s own offset (the repeated hour of autumn stays apart).
+const sfHour = (t, tz) => {
+  const off = sfOffset(t, tz);
+  const wall = t + off;
+  return wall - (((wall % 3.6e6) + 3.6e6) % 3.6e6) - off;
 };
 // Midnight `offset` days from the day of `t`.
-const sfDay = (t, offset = 0) => {
-  const d = new Date(t);
-  d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() + offset);
-  return d.getTime();
+const sfDay = (t, offset = 0, tz) => {
+  const p = sfParts(t, tz);
+  return sfAt(p.y, p.m, p.d + offset, 0, tz);
 };
 
 // The hour by hour forecast (kWh per hour start) a sensor's attributes carry: Solcast's detailedHourly or
 // detailedForecast (average kW over each period), Open-Meteo's wh_period (Wh per period start).
-const sfAttrHours = (st, into = new Map()) => {
+const sfAttrHours = (st, into = new Map(), tz) => {
   const a = st?.attributes || {};
   const add = (t, kwh) => {
     if (!Number.isFinite(t) || !Number.isFinite(kwh)) return;
-    const h = sfHour(t);
+    const h = sfHour(t, tz);
     into.set(h, (into.get(h) || 0) + kwh);
   };
   const list = a.detailedHourly || a.detailedForecast;
@@ -526,10 +561,10 @@ const sfAttrHours = (st, into = new Map()) => {
 };
 
 // The Energy dashboard's forecast (energy/solar_forecast: Wh per hour, per config entry), summed over the entries.
-const sfWsHours = (forecasts, into = new Map()) => {
+const sfWsHours = (forecasts, into = new Map(), tz) => {
   for (const f of Object.values(forecasts || {}))
     for (const [k, v] of Object.entries(f?.wh_hours || {})) {
-      const h = sfHour(new Date(k).getTime());
+      const h = sfHour(new Date(k).getTime(), tz);
       if (Number.isFinite(h)) into.set(h, (into.get(h) || 0) + Number(v) / 1000);
     }
   return into;

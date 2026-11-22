@@ -73,6 +73,30 @@ test("hours: Solcast's detailed forecast, Open-Meteo's wh_period and the Energy 
   assert.equal(ws.get(t), 1.5, "the entries add up");
 });
 
+test("days and hours are counted in Home Assistant's time zone, unless the profile asks for the browser's", () => {
+  assert.equal(sf.sfTz({ config: { time_zone: "Pacific/Kiritimati" }, locale: {} }), "Pacific/Kiritimati");
+  assert.equal(sf.sfTz({ config: { time_zone: "Pacific/Kiritimati" }, locale: { time_zone: "server" } }), "Pacific/Kiritimati");
+  assert.equal(sf.sfTz({ config: { time_zone: "Pacific/Kiritimati" }, locale: { time_zone: "local" } }), undefined);
+  const tz = "Pacific/Kiritimati"; // UTC+14, no daylight saving time
+  const t = Date.UTC(2026, 5, 10, 11, 20); // 2026-06-11 01:20 there
+  assert.equal(sf.sfDay(t, 0, tz), Date.UTC(2026, 5, 10, 10), "midnight of the 11th there");
+  assert.equal(sf.sfDay(t, 1, tz), Date.UTC(2026, 5, 11, 10));
+  assert.equal(sf.sfHour(t, tz), Date.UTC(2026, 5, 10, 11));
+  assert.deepEqual(json(sf.sfParts(t, tz)), { y: 2026, m: 5, d: 11, h: 1, min: 20 });
+  // Paris: 2026-03-29 has 23 hours (2:00 → 3:00).
+  const paris = "Europe/Paris";
+  assert.equal(sf.sfDay(Date.UTC(2026, 2, 29, 12), 0, paris), Date.UTC(2026, 2, 28, 23));
+  assert.equal(sf.sfDay(Date.UTC(2026, 2, 29, 12), 1, paris), Date.UTC(2026, 2, 29, 22));
+  assert.equal(sf.sfHour(Date.UTC(2026, 9, 25, 0, 30), paris), Date.UTC(2026, 9, 25, 0), "the repeated hour of October");
+});
+
+test("the recorder's statistics start at midnight in Home Assistant's time zone", async () => {
+  const hass = makeHass({ now: NOW, config: { time_zone: "Pacific/Kiritimati" } });
+  await make("solar-forecast-card", ENTITY, hass);
+  const q = hass.ws.find((w) => w.type === "recorder/statistics_during_period");
+  assert.equal(new Date(q.start_time).getTime(), sf.sfDay(NOW, 0, "Pacific/Kiritimati"));
+});
+
 test("best window: the hours in a row with the most forecast, from now on", () => {
   const hours = [0, 1, 3, 4, 2, 1, 0].map((f, i) => ({ t: i * 3.6e6, f }));
   const b = sf.sfBestWindow(hours, 0, 2);
