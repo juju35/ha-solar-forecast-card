@@ -215,7 +215,10 @@ class SolarForecastCard extends RcCard {
     const todaySt = st("today");
     const hourly = new Map();
     for (const r of ["today", "tomorrow", "day3"]) sfAttrHours(st(r), hourly, tz);
-    if (!hourly.size) sfWsHours(ws?.wh, hourly, tz);
+    if (!hourly.size) {
+      const only = rcMemo(this._memo, "entries", [e.today, !!c.entity, h.entities, h.devices], () => sfEntries(h, e.today, !!c.entity));
+      sfWsHours(ws?.wh, hourly, tz, only);
+    }
     const act = ws?.act || null;
     // The 24 hour starts of today and the next two days, worked out once a day.
     const starts = rcMemo(this._memo, "hours", [sfDay(now, 0, tz), tz], () =>

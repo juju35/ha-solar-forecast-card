@@ -109,7 +109,7 @@ export const load = ({ now } = {}) => {
   const code = [read("shared"), ...cards.map((c) => `{\n${read(c)}}\n`)].join("\n");
   return vm.runInContext(
     `${code}
-    ({ RcCard, RC_I18N, SF_I18N, rcLang, sfFind, sfSources, sfAttrHours, sfWsHours, sfBestWindow, sfHour, sfDay, sfTz, sfParts, customElements, window,
+    ({ RcCard, RC_I18N, SF_I18N, rcLang, sfFind, sfSources, sfAttrHours, sfWsHours, sfBestWindow, sfHour, sfDay, sfTz, sfEntries, sfParts, customElements, window,
        cards: Object.fromEntries(${JSON.stringify([...cards, "solar-forecast-mini-card"])}.map((t) => [t, customElements.get(t)])) })`,
     ctx,
   );

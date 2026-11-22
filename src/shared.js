@@ -560,9 +560,26 @@ const sfAttrHours = (st, into = new Map(), tz) => {
   return into;
 };
 
-// The Energy dashboard's forecast (energy/solar_forecast: Wh per hour, per config entry), summed over the entries.
-const sfWsHours = (forecasts, into = new Map(), tz) => {
-  for (const f of Object.values(forecasts || {}))
+// The forecast integration entries the card's numbers come from: those of the chosen sensor's device when an
+// `entity` is set; else every entry of the integration (platform) of the today sensor found, so two integrations
+// forecasting the same roof are never added up (the planes of one integration are). Null: no way to tell.
+const sfEntries = (hass, todayId, own) => {
+  const reg = hass.entities || {};
+  const devs = hass.devices || {};
+  const ent = todayId && reg[todayId];
+  if (!ent?.device_id || !devs[ent.device_id]) return null;
+  if (own) return new Set(devs[ent.device_id].config_entries || []);
+  const out = new Set();
+  for (const e of Object.values(reg)) if (e.platform === ent.platform && devs[e.device_id]) for (const c of devs[e.device_id].config_entries || []) out.add(c);
+  return out.size ? out : null;
+};
+
+// The Energy dashboard's forecast (energy/solar_forecast: Wh per hour, per config entry), summed over the entries of
+// `only` (all of them when null, or when none of them is there).
+const sfWsHours = (forecasts, into = new Map(), tz, only = null) => {
+  const all = Object.entries(forecasts || {});
+  const kept = only ? all.filter(([id]) => only.has(id)) : all;
+  for (const [, f] of kept.length ? kept : all)
     for (const [k, v] of Object.entries(f?.wh_hours || {})) {
       const h = sfHour(new Date(k).getTime(), tz);
       if (Number.isFinite(h)) into.set(h, (into.get(h) || 0) + Number(v) / 1000);

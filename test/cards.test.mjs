@@ -73,6 +73,26 @@ test("hours: Solcast's detailed forecast, Open-Meteo's wh_period and the Energy 
   assert.equal(ws.get(t), 1.5, "the entries add up");
 });
 
+test("energy dashboard forecast: only the entries of the card's integration are added up", () => {
+  const t = at(0, 12);
+  const k = new Date(t).toISOString();
+  const forecasts = { plane1: { wh_hours: { [k]: 1000 } }, plane2: { wh_hours: { [k]: 500 } }, solcast: { wh_hours: { [k]: 1400 } } };
+  const h = {
+    entities: {
+      "sensor.energy_production_today": { device_id: "p1", platform: "forecast_solar" },
+      "sensor.energy_production_today_2": { device_id: "p2", platform: "forecast_solar" },
+      "sensor.solcast_pv_forecast_forecast_today": { device_id: "s", platform: "solcast_solar" },
+    },
+    devices: { p1: { config_entries: ["plane1"] }, p2: { config_entries: ["plane2"] }, s: { config_entries: ["solcast"] } },
+  };
+  const same = sf.sfEntries(h, "sensor.energy_production_today", false);
+  assert.deepEqual(json([...same].sort()), ["plane1", "plane2"], "the planes of one integration");
+  assert.equal(sf.sfWsHours(forecasts, new Map(), undefined, same).get(t), 1.5, "Solcast's forecast of the same roof is left out");
+  assert.equal(sf.sfWsHours(forecasts, new Map(), undefined, sf.sfEntries(h, "sensor.energy_production_today", true)).get(t), 1, "the chosen entity's entry alone");
+  assert.equal(sf.sfWsHours(forecasts, new Map(), undefined, new Set(["gone"])).get(t), 2.9, "no entry left: all of them");
+  assert.equal(sf.sfEntries({ entities: {}, devices: {} }, "sensor.x", false), null);
+});
+
 test("days and hours are counted in Home Assistant's time zone, unless the profile asks for the browser's", () => {
   assert.equal(sf.sfTz({ config: { time_zone: "Pacific/Kiritimati" }, locale: {} }), "Pacific/Kiritimati");
   assert.equal(sf.sfTz({ config: { time_zone: "Pacific/Kiritimati" }, locale: { time_zone: "server" } }), "Pacific/Kiritimati");

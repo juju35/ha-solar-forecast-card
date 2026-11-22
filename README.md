@@ -153,7 +153,7 @@ entities:
 ## How it works
 
 - **Forecast**: `entity`, else the first *energy production today* sensor of Forecast.Solar, Solcast or Open-Meteo Solar Forecast; the other roles on its device by their translation key or entity id: `today`, `remaining`, `tomorrow`, `day3` (Solcast), `now` (the power now), `peak` (the peak time); `entities` sets any of them
-- **Hour by hour**: Solcast's `detailedHourly` / `detailedForecast` and Open-Meteo's `wh_period` attributes, else the Energy dashboard's forecast (`energy/solar_forecast`, the forecasts of its solar panels added up); without either, the card shows the numbers and a hint
+- **Hour by hour**: Solcast's `detailedHourly` / `detailedForecast` and Open-Meteo's `wh_period` attributes, else the Energy dashboard's forecast (`energy/solar_forecast`): the entries of the chosen sensor's device when `entity` is set, else those of its integration, so two integrations forecasting the same roof are not added up (the planes of one integration are); without either, the card shows the numbers and a hint
 - **Production**: the hourly `change` of the production sensor's statistics since midnight (`recorder/statistics_during_period`), fetched at first, every 10 minutes and at each new hour; the sensor is `production`, else the Energy dashboard's solar source
 - **Status**: produced against the forecast so far (today's forecast minus what is still to come) once 0.2 kWh were expected: above 110 %, on track from 85 %, below under that; *Night* while `sun.sun` is below the horizon; *Forecast* without a production
 - **Best time**: the `window_hours` hours in a row with the most forecast energy, from the next hour once a quarter of this one has gone; when none is left today, tomorrow's
