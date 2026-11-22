@@ -562,6 +562,9 @@ class SolarForecastCard extends RcCard {
     .banner .rs { display: flex; flex-wrap: wrap; gap: 4px; height: 20px; margin: 3px 0 0 -2px; min-width: 0; overflow: hidden; }
     .banner .r { flex: none; line-height: 20px; padding: 0 7px; color: var(--bt); background: rgba(255,255,255,.62); }
     .banner.night .r { background: rgba(10,20,40,.4); }
+    .banner span.r { cursor: default; }
+    .banner span.r:hover { background: rgba(255,255,255,.62); }
+    .banner.night span.r:hover { background: rgba(10,20,40,.4); }
     .banner .ringb { position: absolute; inset: 0; }
     /* Home Assistant's dark theme: the sun's colours on a dark tile. */
     ha-card.dk { --sf-l1: #4a3d1f; --sf-l2: #7a5a1c; --sf-l3: #b07818; --sf-l4: #e08a18; --sf-l5: #f76707; }
@@ -613,7 +616,9 @@ class SolarForecastMiniCard extends rcMini(
     const night = this._night();
     if (!this._changed(["mini", m.state, m.total, m.remaining, m.produced, m.soFar, m.tomorrow, night, m.p > 0.5])) return;
     const status = this._t(`st_${m.state === "none" ? "offline" : m.state}`);
-    const chip = (text, id) => `<button class="r"${id ? ` data-id="${rcEsc(id)}"` : ""} title="${rcEsc(text)}"><span>${rcEsc(text)}</span></button>`;
+    // A chip opens its sensor's more-info; one with nothing to open is plain text.
+    const chip = (text, id) =>
+      id ? `<button class="r" data-id="${rcEsc(id)}" title="${rcEsc(text)}"><span>${rcEsc(text)}</span></button>` : `<span class="r" title="${rcEsc(text)}"><span>${rcEsc(text)}</span></span>`;
     const chips = m.none
       ? chip(this._t("no_forecast"))
       : [

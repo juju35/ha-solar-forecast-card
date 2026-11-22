@@ -197,6 +197,9 @@ test("mini card: the ring, the chips, and the zoom to the full card", async () =
   assert.match(html, /class="ringb"/);
   assert.match(html, / kWh to come/);
   assert.match(html, /Tomorrow 22\.3 kWh/);
+  assert.match(html, /<button class="r" data-id="sensor\.energy_production_tomorrow"/, "a chip with a sensor opens it");
+  const none = await make("solar-forecast-mini-card", {}, { ...makeHass({ now: NOW, ws: false }), entities: {}, states: {} });
+  assert.match(none.shadowRoot.innerHTML, /<span class="r" title="No solar forecast found/, "a chip with nothing to open is plain text");
   card._zoomed = true;
   card._sig = null;
   card._render();
