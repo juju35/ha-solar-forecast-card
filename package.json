@@ -1,6 +1,6 @@
 {
   "name": "ha-solar-forecast-card",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "A Lovelace card for Home Assistant solar production forecasts: today hour by hour, the best time to run appliances, and the next days.",
   "repository": {
     "type": "git",
