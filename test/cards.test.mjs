@@ -114,7 +114,42 @@ test("the recorder's statistics start at midnight in Home Assistant's time zone"
   const hass = makeHass({ now: NOW, config: { time_zone: "Pacific/Kiritimati" } });
   await make("solar-forecast-card", ENTITY, hass);
   const q = hass.ws.find((w) => w.type === "recorder/statistics_during_period");
-  assert.equal(new Date(q.start_time).getTime(), sf.sfDay(NOW, 0, "Pacific/Kiritimati"));
+  assert.equal(new Date(q.start_time).getTime(), sf.sfDay(NOW, 0, "Pacific/Kiritimati") - 3.6e6, "from the hour before midnight");
+});
+
+test("a `production` sensor set in the config is the one read, its live reading filling the hour under way", async () => {
+  // A daily yield sensor: 0.5 kWh per hour from 6:00, the recorder compiled up to 14:00, now 15:30 at 5.25 kWh.
+  const rows = [];
+  for (let h = -1; h < 15; h++) {
+    const t = h < 0 ? at(-1, 23) : at(0, h);
+    const state = h < 6 ? (h < 0 ? 9 : 0) : (h - 5) * 0.5;
+    rows.push({ start: t, end: t + 3.6e6, change: h < 6 ? 0 : 0.5, state });
+  }
+  const hass = makeHass({ now: NOW });
+  hass.states["sensor.daily_yield"] = st("sensor.daily_yield", "5250", { unit_of_measurement: "Wh", device_class: "energy" });
+  const base = hass.callWS;
+  hass.callWS = async (msg) => {
+    if (msg.type === "recorder/statistics_during_period") {
+      hass.ws.push(msg);
+      return { "sensor.daily_yield": rows };
+    }
+    return base(msg);
+  };
+  const card = await make("solar-forecast-card", { ...ENTITY, production: "sensor.daily_yield" }, hass);
+  const q = hass.ws.find((w) => w.type === "recorder/statistics_during_period");
+  assert.deepEqual(json(q.statistic_ids), ["sensor.daily_yield"]);
+  assert.ok(!hass.ws.some((w) => w.type === "energy/get_prefs"), "the Energy dashboard is not asked for its solar source");
+  assert.equal(Math.round(card._items.produced * 100) / 100, 5.25, "4.5 kWh compiled + 0.75 kWh live");
+  hass.states["sensor.daily_yield"] = st("sensor.daily_yield", "5400", { unit_of_measurement: "Wh", device_class: "energy" });
+  card.hass = hass;
+  assert.equal(Math.round(card._items.produced * 100) / 100, 5.4, "follows the sensor between two compiled hours");
+  // A lifetime counter reading a little lower than an hour ago is a glitch, not a reset: no energy for the hour.
+  hass.states["sensor.daily_yield"] = st("sensor.daily_yield", "4450", { unit_of_measurement: "Wh", device_class: "energy" });
+  card.hass = hass;
+  assert.equal(Math.round(card._items.produced * 100) / 100, 4.5, "a small drop adds nothing");
+  hass.states["sensor.daily_yield"] = st("sensor.daily_yield", "200", { unit_of_measurement: "Wh", device_class: "energy" });
+  card.hass = hass;
+  assert.equal(Math.round(card._items.produced * 100) / 100, 4.7, "a reset starts again from 0");
 });
 
 test("best window: the hours in a row with the most forecast, from now on", () => {
