@@ -144,21 +144,33 @@ class SolarForecastCard extends RcCard {
       }
       const wh = await h.callWS({ type: "energy/solar_forecast" }).catch(() => null);
       let act = null;
+      let last = null;
       if (prod) {
+        // From the hour before midnight: its reading is where the first hour of today starts from.
+        const day0 = sfDay(now, 0, tz);
         const r = await h
           .callWS({
             type: "recorder/statistics_during_period",
-            start_time: new Date(sfDay(now, 0, tz)).toISOString(),
+            start_time: new Date(day0 - 3.6e6).toISOString(),
             end_time: new Date(sfHour(now, tz) + 3.6e6).toISOString(),
             statistic_ids: [prod],
             period: "hour",
-            types: ["change"],
+            types: ["change", "state"],
             units: { energy: "kWh" },
           })
           .catch(() => null);
-        if (r) act = new Map((r[prod] || []).map((x) => [sfHour(typeof x.start === "number" ? x.start : new Date(x.start).getTime(), tz), Number(x.change) || 0]));
+        if (r) {
+          const rows = (r[prod] || []).map((x) => ({
+            t: sfHour(typeof x.start === "number" ? x.start : new Date(x.start).getTime(), tz),
+            change: Number(x.change) || 0,
+            state: x.state == null ? null : Number(x.state),
+          }));
+          act = new Map(rows.filter((x) => x.t >= day0).map((x) => [x.t, x.change]));
+          const end = rows[rows.length - 1];
+          if (end && Number.isFinite(end.state)) last = { t: end.t, state: end.state };
+        }
       }
-      this._ws = { wh, act, prod, hour: sfHour(now, tz), at: now };
+      this._ws = { wh, act, last, prod, hour: sfHour(now, tz), at: now };
     } finally {
       this._busy = false;
     }
@@ -219,7 +231,15 @@ class SolarForecastCard extends RcCard {
       const only = rcMemo(this._memo, "entries", [e.today, !!c.entity, h.entities, h.devices], () => sfEntries(h, e.today, !!c.entity));
       sfWsHours(ws?.wh, hourly, tz, only);
     }
-    const act = ws?.act || null;
+    let act = ws?.act || null;
+    // The recorder compiles an hour once it is over: the hour under way comes from the production sensor's live
+    // reading, minus its reading at the end of the hour before (a sensor reset at midnight starts again from 0).
+    const live = ws?.prod ? sfKwh(h.states[ws.prod]) : null;
+    const curH = sfHour(now, tz);
+    if (act && live != null && ws.last && ws.last.t === curH - 3.6e6) {
+      act = new Map(act);
+      act.set(curH, live >= ws.last.state ? live - ws.last.state : live);
+    }
     // The 24 hour starts of today and the next two days, worked out once a day.
     const starts = rcMemo(this._memo, "hours", [sfDay(now, 0, tz), tz], () =>
       [0, 1, 2].map((offset) => {

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.4 - 2026-11-24
+
+### Fixes
+- The production follows the `production` sensor live (#6). The recorder compiles an hour's statistics only once the hour is over, so the energy produced today moved once an hour; the hour under way now comes from the sensor's live reading, minus its reading at the end of the hour before (a daily sensor reset at midnight starts again from 0). A `production` sensor set in the config is still the one read, the Energy dashboard's solar source only when none is set.
+
 ## 1.0.3 - 2026-11-24
 
 ### Maintenance
