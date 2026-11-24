@@ -143,6 +143,13 @@ test("a `production` sensor set in the config is the one read, its live reading 
   hass.states["sensor.daily_yield"] = st("sensor.daily_yield", "5400", { unit_of_measurement: "Wh", device_class: "energy" });
   card.hass = hass;
   assert.equal(Math.round(card._items.produced * 100) / 100, 5.4, "follows the sensor between two compiled hours");
+  // A lifetime counter reading a little lower than an hour ago is a glitch, not a reset: no energy for the hour.
+  hass.states["sensor.daily_yield"] = st("sensor.daily_yield", "4450", { unit_of_measurement: "Wh", device_class: "energy" });
+  card.hass = hass;
+  assert.equal(Math.round(card._items.produced * 100) / 100, 4.5, "a small drop adds nothing");
+  hass.states["sensor.daily_yield"] = st("sensor.daily_yield", "200", { unit_of_measurement: "Wh", device_class: "energy" });
+  card.hass = hass;
+  assert.equal(Math.round(card._items.produced * 100) / 100, 4.7, "a reset starts again from 0");
 });
 
 test("best window: the hours in a row with the most forecast, from now on", () => {

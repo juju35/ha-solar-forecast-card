@@ -233,12 +233,14 @@ class SolarForecastCard extends RcCard {
     }
     let act = ws?.act || null;
     // The recorder compiles an hour once it is over: the hour under way comes from the production sensor's live
-    // reading, minus its reading at the end of the hour before (a sensor reset at midnight starts again from 0).
+    // reading, minus its reading at the end of the hour before. As for the recorder, a drop of more than 10 % is a
+    // reset (a daily sensor at midnight: it starts again from 0); a smaller one is a glitch of a counter, not energy.
     const live = ws?.prod ? sfKwh(h.states[ws.prod]) : null;
     const curH = sfHour(now, tz);
     if (act && live != null && ws.last && ws.last.t === curH - 3.6e6) {
+      const prev = ws.last.state;
       act = new Map(act);
-      act.set(curH, live >= ws.last.state ? live - ws.last.state : live);
+      act.set(curH, live >= prev ? live - prev : live < prev * 0.9 ? live : 0);
     }
     // The 24 hour starts of today and the next two days, worked out once a day.
     const starts = rcMemo(this._memo, "hours", [sfDay(now, 0, tz), tz], () =>
